@@ -28,9 +28,10 @@ Usage:
 
 No API keys, no signup, no third-party services - pure stdlib HTTP requests
 to the target's own web server. Exit code is 0 always (this is a reporting
-tool, not a CI gate) unless given zero arguments.
+tool, not a CI gate); 2 on a usage error (e.g. no domain given).
 """
 
+import argparse
 import sys
 import urllib.request
 import urllib.error
@@ -137,7 +138,19 @@ def check_security_txt(domain, findings):
     if "contact" not in fields:
         findings.append(("security.txt", "WARN", "missing required 'Contact:' field"))
     else:
-        findings.append(("security.txt", "OK", f"Contact: {', '.join(fields['contact'])}"))
+        contacts = fields["contact"]
+        findings.append(("security.txt", "OK", f"Contact: {', '.join(contacts)}"))
+        schemes = {c.split(":", 1)[0].lower() for c in contacts if ":" in c}
+        bad = [c for c in contacts if c.split(":", 1)[0].lower() not in ("mailto", "https", "tel")]
+        if bad:
+            findings.append(("security.txt", "WARN",
+                              f"Contact value(s) not a mailto:/https:/tel: URI as RFC 9116 requires: {', '.join(bad)}"))
+        if "mailto" in schemes and "https" not in schemes:
+            findings.append(("security.txt", "INFO",
+                              "Contact is email-only -- consider also listing an https:// reporting page/form"))
+        elif "https" in schemes and "mailto" not in schemes:
+            findings.append(("security.txt", "INFO",
+                              "Contact is web-only -- consider also listing a mailto: address"))
 
     if "expires" not in fields:
         findings.append(("security.txt", "WARN", "missing required 'Expires:' field"))
@@ -145,6 +158,8 @@ def check_security_txt(domain, findings):
         exp_raw = fields["expires"][0]
         try:
             exp_dt = datetime.fromisoformat(exp_raw.replace("Z", "+00:00"))
+            if exp_dt.tzinfo is None:
+                raise ValueError("no timezone")
             now = datetime.now(timezone.utc)
             if exp_dt < now:
                 findings.append(("security.txt", "WARN",
@@ -154,7 +169,8 @@ def check_security_txt(domain, findings):
                 findings.append(("security.txt", "OK", f"Expires: {exp_raw} (not yet expired)"))
         except Exception:
             findings.append(("security.txt", "WARN",
-                              f"Expires field present but not a parseable ISO date: {exp_raw}"))
+                              f"Expires field present but not an RFC 3339 date-time with a timezone "
+                              f"(e.g. 2027-01-01T00:00:00Z): {exp_raw}"))
 
     if found_at.endswith("/security.txt") and found_at != f"https://{domain}/.well-known/security.txt":
         findings.append(("security.txt", "INFO",
@@ -173,10 +189,16 @@ def audit(domain):
 
 
 def main():
-    if len(sys.argv) < 2:
-        print(__doc__)
-        sys.exit(1)
-    for domain in sys.argv[1:]:
+    parser = argparse.ArgumentParser(
+        prog="security_txt_auditor.py",
+        description="Audit a domain's robots.txt and security.txt (RFC 9116) "
+                    "for common misconfigurations.",
+        epilog="Example: python3 security_txt_auditor.py example.com example.org",
+    )
+    parser.add_argument("domains", nargs="+", metavar="domain",
+                        help="domain or URL to audit (scheme and trailing slash are stripped)")
+    args = parser.parse_args()
+    for domain in args.domains:
         domain = domain.strip().replace("https://", "").replace("http://", "").rstrip("/")
         audit(domain)
 
