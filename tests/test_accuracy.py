@@ -224,7 +224,9 @@ class TestRobotsAgainstRobotparser(unittest.TestCase):
     def test_random_corpus(self):
         rng = random.Random(9116)
         agents = ["*", "Googlebot", "Bingbot", "BadBot"]
-        paths = ["/", "/admin/", "/tmp", "", "/search"]
+        # no empty "Disallow:" lines: Python 3.7's robotparser reads one as "allow everything" for
+        # the rest of the group, which RFC 9309 doesn't (an empty Disallow matches nothing)
+        paths = ["/", "/admin/", "/tmp", "/search"]
         for n in range(200):
             groups = []
             star_used = False
