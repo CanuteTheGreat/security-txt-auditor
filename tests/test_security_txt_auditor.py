@@ -6,6 +6,7 @@ the openssl CLI, trusted through SSL_CERT_FILE) and runs the tool unmodified as
 a subprocess against "localhost:<port>" -- the same code path as a real domain.
 """
 import datetime
+import json
 import os
 import shutil
 import socket
@@ -29,10 +30,13 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
     def do_GET(self):
-        status, body = ROUTES.get(self.path, (404, "not found"))
+        route = ROUTES.get(self.path, (404, "not found"))
+        status, body = route[0], route[1]
+        ctype = route[2] if len(route) > 2 else "text/plain; charset=utf-8"
         data = body.encode()
         self.send_response(status)
-        self.send_header("Content-Type", "text/plain")
+        if ctype:
+            self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
@@ -77,12 +81,19 @@ def past(days=10):
 GOOD_SECTXT = "Contact: mailto:security@example.test\nContact: https://example.test/report\nExpires: %s\n"
 
 
+def canonical():
+    return "Canonical: https://%s/.well-known/security.txt\n" % HOST
+
+
 class Base(unittest.TestCase):
-    def audit(self, routes, target=None):
+    def audit(self, routes, target=None, code=None, args=()):
         ROUTES.clear()
         ROUTES.update(routes)
-        p = run(target or HOST)
-        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)  # reporting tool: always 0
+        p = run(*args, target or HOST)
+        if code is not None:
+            self.assertEqual(p.returncode, code, p.stdout + p.stderr)
+        self.assertIn(p.returncode, (0, 1, 2), p.stderr)
+        self.last_code = p.returncode
         return p.stdout
 
     def lines(self, out, level, category):
@@ -123,18 +134,19 @@ class TestRobots(Base):
         s.close()
         ROUTES.clear()
         p = run("localhost:%d" % port)
-        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertEqual(p.returncode, 2, p.stderr)
         self.assertTrue(self.lines(p.stdout, "ERROR", "robots.txt"), p.stdout)
+        self.assertTrue(any("skipped" in l for l in self.lines(p.stdout, "ERROR", "security.txt")), p.stdout)
 
 
 class TestSecurityTxt(Base):
     def test_missing_everywhere_is_info(self):
-        out = self.audit({"/robots.txt": (200, "User-agent: *\n")})
+        out = self.audit({"/robots.txt": (200, "User-agent: *\n")}, code=1)
         self.assertTrue(any("not present at either standard location" in l
-                            for l in self.lines(out, "INFO", "security.txt")), out)
+                            for l in self.lines(out, "WARN", "security.txt")), out)
 
     def test_good_file_at_well_known(self):
-        out = self.audit({"/.well-known/security.txt": (200, GOOD_SECTXT % future())})
+        out = self.audit({"/.well-known/security.txt": (200, GOOD_SECTXT % future() + canonical())}, code=0)
         self.assertTrue(any("found at https://%s/.well-known/security.txt" % HOST in l
                             for l in self.lines(out, "OK", "security.txt")), out)
         self.assertTrue(any("not yet expired" in l for l in self.lines(out, "OK", "security.txt")), out)
@@ -158,7 +170,7 @@ class TestSecurityTxt(Base):
                                 for l in self.lines(out, "WARN", "security.txt")), out)
 
     def test_legacy_location_only(self):
-        out = self.audit({"/security.txt": (200, GOOD_SECTXT % future())})
+        out = self.audit({"/security.txt": (200, GOOD_SECTXT % future())}, code=0)
         self.assertTrue(any("found at https://%s/security.txt" % HOST in l
                             for l in self.lines(out, "OK", "security.txt")), out)
         self.assertTrue(any("only found at legacy /security.txt" in l
@@ -178,15 +190,87 @@ class TestSecurityTxt(Base):
         self.assertTrue(any("not a mailto:/https:/tel: URI" in l and "security@example.test" in l
                             for l in self.lines(out, "WARN", "security.txt")), out)
 
+    def test_expires_more_than_a_year_out_or_repeated(self):
+        out = self.audit({"/.well-known/security.txt": (200, GOOD_SECTXT % future(400))}, code=1)
+        self.assertTrue(any("more than a year out" in l for l in self.lines(out, "WARN", "security.txt")), out)
+        body = GOOD_SECTXT % future() + "Expires: %s\n" % future(10)
+        out = self.audit({"/.well-known/security.txt": (200, body)}, code=1)
+        self.assertTrue(any("appears 2 times" in l for l in self.lines(out, "WARN", "security.txt")), out)
+
+    def test_content_type(self):
+        body = GOOD_SECTXT % future()
+        out = self.audit({"/.well-known/security.txt": (200, body, "text/html")}, code=1)
+        self.assertTrue(any("served as 'text/html'" in l for l in self.lines(out, "WARN", "security.txt")), out)
+        out = self.audit({"/.well-known/security.txt": (200, body, "text/plain")}, code=0)
+        self.assertTrue(any("no charset=utf-8" in l for l in self.lines(out, "INFO", "security.txt")), out)
+
+    def test_canonical(self):
+        out = self.audit({"/.well-known/security.txt": (200, GOOD_SECTXT % future())}, code=0)
+        self.assertTrue(any("no 'Canonical:' field" in l for l in self.lines(out, "INFO", "security.txt")), out)
+        body = GOOD_SECTXT % future() + "Canonical: https://other.example/.well-known/security.txt\n"
+        out = self.audit({"/.well-known/security.txt": (200, body)}, code=1)
+        self.assertTrue(any("none of the Canonical URLs" in l for l in self.lines(out, "WARN", "security.txt")), out)
+        out = self.audit({"/.well-known/security.txt": (200, GOOD_SECTXT % future() + canonical())}, code=0)
+        self.assertTrue(any("Canonical matches" in l for l in self.lines(out, "OK", "security.txt")), out)
+
+    def test_linked_urls_and_unknown_fields(self):
+        body = (GOOD_SECTXT % future() + canonical() + "Policy: https://%s/policy\n" % HOST
+                + "Encryption: https://%s/missing-key.asc\n" % HOST + "Hiring: http://%s/jobs\n" % HOST
+                + "Encryption: openpgp4fpr:5f2de5521c63a801ab59ccb603d49de44b29100f\nFavourite-Colour: blue\n")
+        out = self.audit({"/.well-known/security.txt": (200, body), "/policy": (200, "policy")}, code=1)
+        self.assertTrue(any("Policy: https://%s/policy reachable" % HOST in l for l in self.lines(out, "OK", "security.txt")), out)
+        warns = " ".join(self.lines(out, "WARN", "security.txt"))
+        self.assertIn("missing-key.asc answers HTTP 404", warns)
+        self.assertIn("uses http://", warns)
+        self.assertNotIn("openpgp4fpr", warns)
+        self.assertTrue(any("unknown field(s): favourite-colour" in l for l in self.lines(out, "INFO", "security.txt")), out)
+        out = self.audit({"/.well-known/security.txt": (200, body)}, args=("--no-url-checks",))
+        self.assertNotIn("missing-key.asc answers", out)
+
+    def test_pgp_signed_file_is_parsed(self):
+        inner = GOOD_SECTXT % future() + canonical() + "- Policy: https://%s/policy\n" % HOST
+        body = ("-----BEGIN PGP SIGNED MESSAGE-----\nHash: SHA512\n\n" + inner
+                + "-----BEGIN PGP SIGNATURE-----\n\niQIzBAEBCgAdFiEE\n=abcd\n-----END PGP SIGNATURE-----\n")
+        out = self.audit({"/.well-known/security.txt": (200, body), "/policy": (200, "p")}, code=0)
+        self.assertTrue(any("cleartext-signed" in l for l in self.lines(out, "OK", "security.txt")), out)
+        self.assertTrue(any("Policy: https://%s/policy reachable" % HOST in l for l in self.lines(out, "OK", "security.txt")), out)
+        self.assertFalse(any("unknown field" in l for l in out.splitlines()), out)
+        out = self.audit({"/.well-known/security.txt": (200, GOOD_SECTXT % future())})
+        self.assertTrue(any("not digitally signed" in l for l in self.lines(out, "INFO", "security.txt")), out)
+
 
 class TestCli(Base):
     def test_multiple_domains_and_url_forms(self):
         ROUTES.clear()
-        ROUTES["/.well-known/security.txt"] = (200, GOOD_SECTXT % future())
+        ROUTES["/.well-known/security.txt"] = (200, GOOD_SECTXT % future() + canonical())
         p = run(HOST, "https://%s/" % HOST, "http://%s" % HOST)
         self.assertEqual(p.returncode, 0, p.stderr)
         self.assertEqual(p.stdout.count("=== %s ===" % HOST), 3, p.stdout)
         self.assertEqual(p.stdout.count("not yet expired"), 3, p.stdout)
+
+    def test_json_and_fail_on_gates(self):
+        ROUTES.clear()
+        ROUTES["/.well-known/security.txt"] = (200, GOOD_SECTXT % future())  # only INFO-level notes
+        p = run("--json", HOST)
+        self.assertEqual(p.returncode, 0, p.stdout)
+        data = json.loads(p.stdout)
+        self.assertEqual(data["exit_code"], 0)
+        self.assertEqual(data["results"][0]["domain"], HOST)
+        levels = {f["level"] for f in data["results"][0]["findings"]}
+        self.assertEqual(levels, {"OK", "INFO"})
+        self.assertEqual(run("--fail-on", "info", HOST).returncode, 1)
+        ROUTES["/.well-known/security.txt"] = (200, GOOD_SECTXT % past())
+        p = run("--json", HOST)
+        self.assertEqual(p.returncode, 1)
+        self.assertEqual(json.loads(p.stdout)["exit_code"], 1)
+        self.assertEqual(run("--fail-on", "never", HOST).returncode, 0)
+        p = run(HOST)
+        self.assertIn("FAIL: findings at or above WARN (exit 1)", p.stdout)
+
+    def test_version(self):
+        p = run("--version")
+        self.assertEqual(p.returncode, 0)
+        self.assertRegex(p.stdout, r"^security-txt-auditor \d+\.\d+\.\d+$")
 
     def test_no_domain_is_usage_error(self):
         p = run()

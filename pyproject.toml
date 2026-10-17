@@ -1,0 +1,43 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "security-txt-auditor"
+dynamic = ["version"]
+description = "Audit robots.txt and security.txt (RFC 9116) for missing, expired or misconfigured fields"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.7"
+authors = [{ name = "Errant Solutions", email = "hello@errant.solutions" }]
+keywords = ["security.txt", "rfc9116", "robots.txt", "security"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: System Administrators",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+    "Topic :: System :: Systems Administration",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://errant.solutions/tools/security-txt-auditor.html"
+Source = "https://git.canutethegreat.com/CanuteTheGreat/security-txt-auditor"
+Changelog = "https://git.canutethegreat.com/CanuteTheGreat/security-txt-auditor/src/branch/main/CHANGELOG.md"
+Releases = "https://git.canutethegreat.com/CanuteTheGreat/security-txt-auditor/releases"
+
+[project.scripts]
+security-txt-auditor = "security_txt_auditor:main"
+
+[tool.hatch.version]
+path = "security_txt_auditor.py"
+
+[tool.hatch.build.targets.wheel]
+only-include = ["security_txt_auditor.py"]
+
+[tool.hatch.build.targets.sdist]
+only-include = ["security_txt_auditor.py", "README.md", "LICENSE", "CHANGELOG.md", "tests"]
