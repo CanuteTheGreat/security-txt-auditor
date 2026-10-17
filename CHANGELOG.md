@@ -2,7 +2,7 @@
 
 All notable changes. Versions are git tags; each tag has a Forgejo release with checksums.
 
-## Unreleased
+## 1.2.1 - 2026-10-17
 
 - robots.txt groups follow RFC 9309: `User-agent: *` followed by another `User-agent:` line and `Disallow: /` blocks every crawler and is now flagged (only the last agent of a group was considered).
 - `Expires:` is parsed with the RFC 3339 grammar on every Python version: Python 3.11+ used to accept non-RFC 3339 forms (`20270101T000000Z`, a space instead of `T`) and older versions rejected valid ones (`.5Z` fractions).

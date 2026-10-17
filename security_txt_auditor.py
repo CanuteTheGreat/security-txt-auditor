@@ -35,7 +35,7 @@ gate) or usage error. No API keys, no third-party services: plain HTTPS requests
 to the target's own web server.
 """
 
-__version__ = "1.2.0"
+__version__ = "1.2.1"
 
 import argparse
 import json
