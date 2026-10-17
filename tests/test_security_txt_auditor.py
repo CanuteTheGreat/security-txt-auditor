@@ -283,5 +283,36 @@ class TestCli(Base):
         self.assertIn("security.txt", p.stdout)
 
 
+class TestExpiresParser(unittest.TestCase):
+    """RFC 3339 section 5.6 date-times, the only Expires form RFC 9116 allows (mutation testing showed
+    the parser's offset/leap-second/validation branches were never pinned down)."""
+
+    def test_rfc3339_forms(self):
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        import security_txt_auditor as st
+        utc = datetime.timezone.utc
+        ok = {
+            "2026-10-17T12:00:00Z": datetime.datetime(2026, 10, 17, 12, 0, 0, tzinfo=utc),
+            "2026-10-17t12:00:00z": datetime.datetime(2026, 10, 17, 12, 0, 0, tzinfo=utc),
+            " 2026-10-17T12:00:00.123456Z ": datetime.datetime(2026, 10, 17, 12, 0, 0, tzinfo=utc),
+            "2026-10-17T12:00:00+05:30": datetime.datetime(2026, 10, 17, 6, 30, 0, tzinfo=utc),
+            "2026-10-17T12:00:00-08:00": datetime.datetime(2026, 10, 17, 20, 0, 0, tzinfo=utc),
+            "2026-10-17T12:00:00+23:59": datetime.datetime(2026, 10, 16, 12, 1, 0, tzinfo=utc),
+            "2026-12-31T23:59:60Z": datetime.datetime(2027, 1, 1, 0, 0, 0, tzinfo=utc),  # leap second
+            "2026-10-17T12:34:56+00:00": datetime.datetime(2026, 10, 17, 12, 34, 56, tzinfo=utc),
+        }
+        for raw, want in ok.items():
+            got = st.parse_expires(raw)
+            self.assertEqual(got, want, raw)
+            self.assertIsNotNone(got.tzinfo, raw)
+        self.assertEqual(st.parse_expires("2026-10-17T12:00:00+05:30").utcoffset(), datetime.timedelta(hours=5, minutes=30))
+        self.assertEqual(st.parse_expires("2026-10-17T12:00:00-08:00").utcoffset(), datetime.timedelta(hours=-8))
+        for bad in ("2026-10-17 12:00:00Z", "2026-10-17T12:00:00", "2026-10-17T12:00Z", "2026-10-17T12:00:00+24:00",
+                    "2026-13-01T00:00:00Z", "2026-02-30T00:00:00Z", "2026-10-17T12:00:00+0530", "Thu, 17 Oct 2026",
+                    "2026-10-17", "", "2026-10-17T12:00:00Zjunk"):
+            with self.assertRaises(ValueError, msg=bad):
+                st.parse_expires(bad)
+
+
 if __name__ == "__main__":
     unittest.main()
