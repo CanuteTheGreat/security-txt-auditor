@@ -90,16 +90,21 @@ def check_robots(domain, findings):
         add(findings, "robots.txt", "WARN", "present but empty")
         return True
 
-    agent, disallow_all, sitemaps = None, False, []
+    # RFC 9309: consecutive User-agent lines open one group; its rules apply to every agent named
+    agents, in_rules, disallow_all, sitemaps = set(), False, False, []
     for raw in r.body.splitlines():
         line = raw.split("#", 1)[0].strip()
         low = line.lower()
         if low.startswith("user-agent:"):
-            agent = line.split(":", 1)[1].strip()
-        elif low.startswith("disallow:") and line.split(":", 1)[1].strip() == "/" and agent in ("*", None):
-            disallow_all = True
+            if in_rules:
+                agents, in_rules = set(), False
+            agents.add(line.split(":", 1)[1].strip())
         elif low.startswith("sitemap:"):
             sitemaps.append(line.split(":", 1)[1].strip())
+        elif low.startswith(("disallow:", "allow:")):
+            in_rules = True
+            if low.startswith("disallow:") and line.split(":", 1)[1].strip() == "/" and ("*" in agents or not agents):
+                disallow_all = True
 
     if disallow_all:
         add(findings, "robots.txt", "WARN", "contains 'Disallow: /' for every crawler - blocks the whole site "
@@ -137,11 +142,24 @@ def parse_security_txt(body):
     return fields, signed
 
 
+RFC3339_RE = re.compile(r"(\d{4})-(\d{2})-(\d{2})[Tt](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(?:([Zz])|([+-])(\d{2}):(\d{2}))")
+
+
 def parse_expires(raw):
-    dt = datetime.fromisoformat(raw.replace("Z", "+00:00").replace("z", "+00:00"))
-    if dt.tzinfo is None:
-        raise ValueError("no timezone")
-    return dt
+    """RFC 3339 section 5.6 date-time (what RFC 9116 requires), parsed the same on every Python:
+    datetime.fromisoformat accepts other ISO 8601 forms on 3.11+ and rejects valid ones before."""
+    m = RFC3339_RE.fullmatch(raw.strip())
+    if not m:
+        raise ValueError("not an RFC 3339 date-time")
+    y, mo, d, h, mi, s = (int(x) for x in m.groups()[:6])
+    if m.group(8):
+        tz = timezone.utc
+    else:
+        off = timedelta(hours=int(m.group(10)), minutes=int(m.group(11)))
+        if off >= timedelta(hours=24):
+            raise ValueError("bad offset")
+        tz = timezone(off if m.group(9) == "+" else -off)
+    return datetime(y, mo, d, h, mi, min(s, 59), tzinfo=tz) + timedelta(seconds=max(s - 59, 0))
 
 
 def check_security_txt(domain, findings, check_urls=True):

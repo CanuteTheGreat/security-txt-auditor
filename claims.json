@@ -1,0 +1,190 @@
+{
+ "offline": false,
+ "optional_imports": [],
+ "hidden_options": [],
+ "claims": [
+  {
+   "id": "robots-missing",
+   "text": "missing entirely",
+   "tests": [
+    "tests/test_security_txt_auditor.py::TestRobots::test_missing_robots_is_info",
+    "tests/test_accuracy.py::TestFalsePositives::test_clean_variants"
+   ]
+  },
+  {
+   "id": "robots-empty",
+   "text": "present but empty",
+   "tests": [
+    "tests/test_security_txt_auditor.py::TestRobots::test_empty_robots_warns",
+    "tests/test_accuracy.py::TestFalseNegatives::test_known_bad"
+   ]
+  },
+  {
+   "id": "robots-sitemap",
+   "text": "references a `Sitemap:` that 404s",
+   "tests": [
+    "tests/test_security_txt_auditor.py::TestRobots::test_ok_robots_and_sitemaps_checked",
+    "tests/test_accuracy.py::TestFalseNegatives::test_known_bad"
+   ]
+  },
+  {
+   "id": "robots-disallow-all",
+   "text": "accidentally contains `Disallow: /`",
+   "tests": [
+    "tests/test_security_txt_auditor.py::TestRobots::test_disallow_all_warns",
+    "tests/test_accuracy.py::TestFalseNegatives::test_known_bad",
+    "tests/test_accuracy.py::TestRobotsAgainstRobotparser::test_random_corpus",
+    "tests/test_accuracy.py::TestFalsePositives::test_clean_variants"
+   ]
+  },
+  {
+   "id": "sectxt-missing",
+   "text": "missing entirely (WARN: no disclosed vulnerability-reporting contact)",
+   "tests": [
+    "tests/test_security_txt_auditor.py::TestSecurityTxt::test_missing_everywhere_is_info",
+    "tests/test_accuracy.py::TestFalseNegatives::test_known_bad"
+   ]
+  },
+  {
+   "id": "content-type",
+   "text": "served as something other than `text/plain`, or without `charset=utf-8`",
+   "tests": [
+    "tests/test_security_txt_auditor.py::TestSecurityTxt::test_content_type",
+    "tests/test_accuracy.py::TestFalseNegatives::test_known_bad",
+    "tests/test_accuracy.py::TestFalsePositives::test_clean_variants"
+   ]
+  },
+  {
+   "id": "contact",
+   "text": "missing `Contact:`, or values that aren't `mailto:` / `https:` / `tel:` URIs",
+   "tests": [
+    "tests/test_security_txt_auditor.py::TestSecurityTxt::test_contact_scheme_checks",
+    "tests/test_security_txt_auditor.py::TestSecurityTxt::test_missing_contact_and_expires",
+    "tests/test_accuracy.py::TestFalseNegatives::test_known_bad"
+   ]
+  },
+  {
+   "id": "expires",
+   "text": "missing `Expires:`, repeated, not an RFC 3339 date-time with a timezone",
+   "tests": [
+    "tests/test_security_txt_auditor.py::TestSecurityTxt::test_expired_file_warns",
+    "tests/test_security_txt_auditor.py::TestSecurityTxt::test_unparseable_or_timezone_less_expires_warns",
+    "tests/test_security_txt_auditor.py::TestSecurityTxt::test_expires_more_than_a_year_out_or_repeated",
+    "tests/test_accuracy.py::TestExpiresGrammar::test_grammar",
+    "tests/test_accuracy.py::TestFalseNegatives::test_known_bad"
+   ]
+  },
+  {
+   "id": "canonical",
+   "text": "`Canonical:` missing (informational) or not matching the URL the file was served from",
+   "tests": [
+    "tests/test_security_txt_auditor.py::TestSecurityTxt::test_canonical",
+    "tests/test_accuracy.py::TestFalseNegatives::test_known_bad"
+   ]
+  },
+  {
+   "id": "linked-urls",
+   "text": "`Policy:` / `Encryption:` / `Acknowledgments:` / `Hiring:` / `Canonical:` links",
+   "tests": [
+    "tests/test_security_txt_auditor.py::TestSecurityTxt::test_linked_urls_and_unknown_fields",
+    "tests/test_accuracy.py::TestFalseNegatives::test_known_bad",
+    "tests/test_accuracy.py::TestRobotsAgainstRobotparser::test_random_corpus"
+   ],
+   "flags": [
+    "--no-url-checks"
+   ]
+  },
+  {
+   "id": "pgp",
+   "text": "an OpenPGP cleartext signature is detected and the signed part is what gets parsed",
+   "tests": [
+    "tests/test_security_txt_auditor.py::TestSecurityTxt::test_pgp_signed_file_is_parsed",
+    "tests/test_accuracy.py::TestFalsePositives::test_clean_variants"
+   ]
+  },
+  {
+   "id": "unknown-legacy",
+   "text": "unknown fields, and a file only found at the legacy location (informational)",
+   "tests": [
+    "tests/test_security_txt_auditor.py::TestSecurityTxt::test_linked_urls_and_unknown_fields",
+    "tests/test_security_txt_auditor.py::TestSecurityTxt::test_legacy_location_only",
+    "tests/test_security_txt_auditor.py::TestSecurityTxt::test_empty_well_known_falls_back_to_legacy"
+   ]
+  },
+  {
+   "id": "json-fail-on",
+   "text": "--json",
+   "tests": [
+    "tests/test_security_txt_auditor.py::TestCli::test_json_and_fail_on_gates"
+   ],
+   "flags": [
+    "--json",
+    "--fail-on"
+   ]
+  },
+  {
+   "id": "exit-codes",
+   "text": "Exit codes",
+   "tests": [
+    "tests/test_security_txt_auditor.py::TestCli::test_json_and_fail_on_gates",
+    "tests/test_security_txt_auditor.py::TestRobots::test_unreachable_host_is_error",
+    "tests/test_security_txt_auditor.py::TestCli::test_no_domain_is_usage_error",
+    "tests/test_accuracy.py::TestFalsePositives::test_well_maintained_site_is_clean"
+   ]
+  },
+  {
+   "id": "stdlib-only",
+   "text": "zero-dependency (Python stdlib only)",
+   "tests": [
+    "tests/test_claims.py::TestClaims::test_stdlib_only"
+   ]
+  },
+  {
+   "id": "install-pipx",
+   "text": "pipx install git+https://git.canutethegreat.com/CanuteTheGreat/security-txt-auditor.git",
+   "tests": [
+    "ci/install-channels.sh#pipx install -q \"git+$FORGEJO/CanuteTheGreat/$REPO.git\"",
+    ".forgejo/workflows/nightly.yml#ci/install-channels.sh"
+   ]
+  },
+  {
+   "id": "install-homebrew",
+   "text": "brew install canutethegreat/errant-tools/security-txt-auditor",
+   "tests": [
+    "repo:homebrew-errant-tools/Formula/security-txt-auditor.rb#test do",
+    "repo:homebrew-errant-tools/.forgejo/workflows/test.yml#ci/run-tests.sh"
+   ]
+  },
+  {
+   "id": "install-scoop",
+   "text": "scoop install errant-tools/security-txt-auditor",
+   "tests": [
+    "repo:scoop-errant-tools/bucket/security-txt-auditor.json#\"bin\"",
+    "repo:scoop-errant-tools/.forgejo/workflows/test.yml#ci/run-tests.sh"
+   ]
+  },
+  {
+   "id": "install-download",
+   "text": "https://errant.solutions/downloads/security_txt_auditor.py",
+   "tests": [
+    "ci/install-channels.sh#https://errant.solutions/downloads/$FILE"
+   ]
+  },
+  {
+   "id": "release-assets",
+   "text": "`SHA256SUMS` file",
+   "tests": [
+    "ci/install-channels.sh#sha256sum -c SHA256SUMS",
+    "ci/release.py#SHA256SUMS"
+   ]
+  },
+  {
+   "id": "python-versions",
+   "text": "Python 3.7+",
+   "tests": [
+    ".forgejo/workflows/test.yml#python: [\"3.7",
+    ".forgejo/workflows/nightly.yml#python: [\"3.7"
+   ]
+  }
+ ]
+}
