@@ -31,7 +31,7 @@ to the legacy `/security.txt`)
 
 ```sh
 pipx install git+https://git.canutethegreat.com/CanuteTheGreat/security-txt-auditor.git        # latest release branch; puts `security-txt-auditor` on PATH
-pipx install git+https://git.canutethegreat.com/CanuteTheGreat/security-txt-auditor.git@v1.2.1  # a pinned release
+pipx install git+https://git.canutethegreat.com/CanuteTheGreat/security-txt-auditor.git@v1.3.0  # a pinned release
 brew install canutethegreat/errant-tools/security-txt-auditor   # after: brew tap canutethegreat/errant-tools https://git.canutethegreat.com/CanuteTheGreat/homebrew-errant-tools
 scoop install errant-tools/security-txt-auditor                 # after: scoop bucket add errant-tools https://git.canutethegreat.com/CanuteTheGreat/scoop-errant-tools
 ```
@@ -48,15 +48,21 @@ Not on PyPI yet, so plain `pipx install security-txt-auditor` doesn't work until
 security-txt-auditor example.com [example2.com ...]
 security-txt-auditor --json example.com           # machine-readable
 security-txt-auditor --fail-on info example.com   # strictest CI gate
+security-txt-auditor --quiet example.com          # exit code only
 ```
 
-Python 3.7+. Exit codes (same convention as every Errant Solutions tool):
+Python 3.7+. Exit codes (the shared Errant Solutions CLI contract, see [docs/CLI-CONTRACT.md](docs/CLI-CONTRACT.md)):
 
 | Code | Meaning |
 |---|---|
 | 0 | nothing at or above `--fail-on` (default `warn`; `info` and `never` also accepted) |
 | 1 | at least one finding at or above `--fail-on` |
-| 2 | a target couldn't be reached (and nothing else failed the gate), or bad usage |
+| 2 | bad usage; also (legacy, kept so existing scripts keep working) a target couldn't be reached and nothing else failed the gate |
+| 3 | unexpected runtime error (message on stderr) |
+
+`--json` prints one object with `schema_version` (currently 1), `tool`, `version`, `exit_code`, `fail_on`
+and `results`; its JSON Schema is [schema/security-txt-auditor.schema.json](schema/security-txt-auditor.schema.json).
+`--quiet` (`-q`) prints nothing on stdout, so the exit code is the whole answer. Errors always go to stderr.
 
 No API keys, no signup, no third-party services involved: it only talks to the
 target's own web server. Source is MIT-licensed; read it before you run it against

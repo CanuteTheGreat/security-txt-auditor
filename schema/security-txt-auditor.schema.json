@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "security-txt-auditor --json output (schema_version 1)",
+  "type": "object",
+  "required": ["schema_version", "tool", "version", "exit_code", "fail_on", "results"],
+  "properties": {
+    "schema_version": {"type": "integer", "const": 1},
+    "tool": {"type": "string", "const": "security-txt-auditor"},
+    "version": {"type": "string"},
+    "exit_code": {"type": "integer", "enum": [0, 1, 2]},
+    "fail_on": {"type": "string", "enum": ["warn", "info", "never"]},
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["domain", "findings"],
+        "properties": {
+          "domain": {"type": "string"},
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["category", "level", "message"],
+              "properties": {
+                "category": {"type": "string"},
+                "level": {"type": "string", "enum": ["ERROR", "WARN", "INFO", "OK"]},
+                "message": {"type": "string"}
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

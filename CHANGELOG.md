@@ -2,6 +2,13 @@
 
 All notable changes. Versions are git tags; each tag has a Forgejo release with checksums.
 
+## 1.3.0 - 2026-11-23
+
+- Shared CLI contract across the Errant Solutions tools ([docs/CLI-CONTRACT.md](docs/CLI-CONTRACT.md)): exit 0 clean, 1 findings, 2 usage error, 3 unexpected runtime error (it used to be a traceback with exit 1). Exit 2 for an unreachable target is kept as it was documented.
+- New `--quiet` / `-q`: no stdout, exit code only.
+- `--json` now carries `schema_version` (1), `tool` and `exit_code` next to the existing keys (nothing removed or renamed); its JSON Schema is in `schema/`.
+- Contract tests (exit codes, JSON against the schema, quiet, stderr) run on every push; the push trigger now covers every branch.
+
 ## 1.2.1 - 2026-10-17
 
 - robots.txt groups follow RFC 9309: `User-agent: *` followed by another `User-agent:` line and `Disallow: /` blocks every crawler and is now flagged (only the last agent of a group was considered).

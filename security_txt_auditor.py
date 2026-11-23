@@ -27,15 +27,17 @@ misconfigurations.
     - only found at the legacy /security.txt location (informational)
 
 Usage:
-    security-txt-auditor [--json] [--fail-on warn|info|never] example.com [example2.com ...]
+    security-txt-auditor [--json] [--quiet] [--fail-on warn|info|never] example.com [example2.com ...]
 
-Exit codes: 0 = nothing at or above --fail-on (default: warn), 1 = at least one
-such finding, 2 = a target could not be reached (and nothing else failed the
-gate) or usage error. No API keys, no third-party services: plain HTTPS requests
+Exit codes (shared CLI contract, docs/CLI-CONTRACT.md): 0 = nothing at or above
+--fail-on (default: warn), 1 = at least one such finding, 2 = usage error, or
+(legacy, kept) a target could not be reached and nothing else failed the gate,
+3 = unexpected runtime error. --json prints one object with schema_version,
+tool, version and exit_code; --quiet prints nothing on stdout. No API keys, no third-party services: plain HTTPS requests
 to the target's own web server.
 """
 
-__version__ = "1.2.1"
+__version__ = "1.3.0"
 
 import argparse
 import json
@@ -265,13 +267,24 @@ def audit(domain, check_urls=True):
 
 
 def main(argv=None):
+    """Entry point. Any unexpected exception is a runtime error (exit 3), never a bare traceback exit 1."""
+    try:
+        return _main(argv)
+    except Exception as exc:  # SystemExit (argparse usage errors, exit 2) is not an Exception
+        print("security-txt-auditor: error: %s: %s" % (type(exc).__name__, exc), file=sys.stderr)
+        return 3
+
+
+def _main(argv=None):
     parser = argparse.ArgumentParser(
         prog="security-txt-auditor",
         description="Audit a domain's robots.txt and security.txt (RFC 9116) for common misconfigurations.",
-        epilog="Exit codes: 0 clean, 1 findings at/above --fail-on, 2 a target was unreachable or bad usage. "
+        epilog="Exit codes: 0 clean, 1 findings at/above --fail-on, 2 a target was unreachable or bad usage, 3 unexpected error. "
                "Example: security-txt-auditor example.com example.org")
     parser.add_argument("--version", action="version", version="%(prog)s " + __version__)
     parser.add_argument("--json", action="store_true", help="machine-readable JSON output")
+    parser.add_argument("-q", "--quiet", action="store_true",
+                        help="print nothing on stdout; the exit code (and errors on stderr) are the result")
     parser.add_argument("--fail-on", choices=sorted(GATE), default="warn",
                         help="lowest level that makes the exit code 1 (default: warn)")
     parser.add_argument("--no-url-checks", action="store_true",
@@ -290,9 +303,11 @@ def main(argv=None):
     errored = any(f["level"] == "ERROR" for r in results for f in r["findings"])
     code = 1 if failed else (2 if errored else 0)
 
-    if args.json:
-        print(json.dumps({"version": __version__, "fail_on": args.fail_on, "exit_code": code, "results": results},
-                         indent=2))
+    if args.quiet:
+        pass
+    elif args.json:
+        print(json.dumps({"schema_version": 1, "tool": "security-txt-auditor", "version": __version__,
+                          "fail_on": args.fail_on, "exit_code": code, "results": results}, indent=2))
     else:
         for r in results:
             print(f"\n=== {r['domain']} ===")

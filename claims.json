@@ -115,7 +115,9 @@
    "id": "json-fail-on",
    "text": "--json",
    "tests": [
-    "tests/test_security_txt_auditor.py::TestCli::test_json_and_fail_on_gates"
+    "tests/test_security_txt_auditor.py::TestCli::test_json_and_fail_on_gates",
+    "tests/test_cli_contract.py::TestJson::test_clean",
+    "tests/test_cli_contract.py::TestJson::test_findings"
    ],
    "flags": [
     "--json",
@@ -129,7 +131,34 @@
     "tests/test_security_txt_auditor.py::TestCli::test_json_and_fail_on_gates",
     "tests/test_security_txt_auditor.py::TestRobots::test_unreachable_host_is_error",
     "tests/test_security_txt_auditor.py::TestCli::test_no_domain_is_usage_error",
-    "tests/test_accuracy.py::TestFalsePositives::test_well_maintained_site_is_clean"
+    "tests/test_accuracy.py::TestFalsePositives::test_well_maintained_site_is_clean",
+    "tests/test_cli_contract.py::TestExitCodes::test_clean_is_0",
+    "tests/test_cli_contract.py::TestExitCodes::test_findings_is_1",
+    "tests/test_cli_contract.py::TestExitCodes::test_bad_args_is_2_with_message_on_stderr",
+    "tests/test_cli_contract.py::TestExitCodes::test_unreachable_target_keeps_documented_legacy_code_2",
+    "tests/test_cli_contract.py::TestExitCodes::test_unexpected_error_is_3_on_stderr_not_a_traceback_exit_1"
+   ]
+  },
+  {
+   "id": "quiet",
+   "text": "`--quiet` (`-q`) prints nothing on stdout, so the exit code is the whole answer",
+   "tests": [
+    "tests/test_cli_contract.py::TestQuiet::test_quiet_prints_nothing_but_keeps_exit_code",
+    "tests/test_cli_contract.py::TestQuiet::test_without_quiet_the_report_is_printed"
+   ],
+   "flags": [
+    "--quiet"
+   ]
+  },
+  {
+   "id": "json-schema",
+   "text": "`--json` prints one object with `schema_version` (currently 1)",
+   "tests": [
+    "tests/test_cli_contract.py::TestJson::test_clean",
+    "tests/test_cli_contract.py::TestJson::test_findings",
+    "tests/test_cli_contract.py::TestJson::test_unreachable",
+    "tests/test_cli_contract.py::TestJson::test_usage_error_leaves_stdout_empty",
+    "tests/test_cli_contract.py::TestJson::test_schema_rejects_a_document_without_the_contract_keys"
    ]
   },
   {
