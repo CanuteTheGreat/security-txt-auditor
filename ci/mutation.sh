@@ -69,10 +69,14 @@ trap cleanup EXIT INT TERM
 # shellcheck disable=SC2086
 docker run -d --name "$NAME" --memory "$MEMORY" --memory-swap "$MEMORY" --cpus 3 --pids-limit 2048 \
   ${EXTRA_DOCKER_ARGS:-} "$IMAGE" sleep 14400 >/dev/null
+# GITHUB_ACTIONS/GITHUB_REF_NAME must reach the container: the gate there publishes the new baseline to the
+# shared `mutation-baseline` branch (store_push no-ops without them, so a full run's baseline was lost and every
+# later incremental night re-counted the documented equivalent survivors as NEW; webhook-sig-verifier run 78)
 docker cp . "$NAME:/src"
 rc=0
 docker exec -w /src -e MIN="$MIN" -e REPORT="$REPORT" -e CHILDREN="$CHILDREN" -e SAMPLE="$SAMPLE" -e DATA_KB="$DATA_KB" \
-  -e MODE="$MODE" -e DIFF="$DIFF" -e MUT_ID="$MUT_ID" "$NAME" sh -ec '
+  -e MODE="$MODE" -e DIFF="$DIFF" -e MUT_ID="$MUT_ID" \
+  -e GITHUB_ACTIONS -e GITHUB_REF_NAME -e GITHUB_RUN_ID "$NAME" sh -ec '
   # the checkout belongs to the runner uid; mutmut and the gate read git history
   git config --global --add safe.directory "*"
   if [ -x ci/setup.sh ]; then ci/setup.sh; fi
